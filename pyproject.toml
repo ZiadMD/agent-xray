@@ -1,0 +1,34 @@
+# uv workspace root: lets every command run from the repository root, e.g.
+#   uv run python examples/basic_fake.py
+#   uv run xray tail
+#   uv run pytest
+[tool.uv.workspace]
+members = ["python"]
+
+[tool.uv.sources]
+agent-xray = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "agent-xray",
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["viewer"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_xray"]
+known-local-folder = ["conftest", "basic_fake"]

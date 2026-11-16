@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# X-Ray recordings made while developing (curated demo runs live in recordings/)
+xray_runs/
+
+# Viewer
+node_modules/
+viewer/dist/
+python/agent_xray/static/
+
+# Env / editors
+.env
+.idea/
+.vscode/
+.DS_Store
