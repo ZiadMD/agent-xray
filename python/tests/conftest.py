@@ -47,7 +47,7 @@ class XRay:
 @pytest.fixture
 def xray(tmp_path: Path) -> XRay:
     session = Session()
-    session.configure(record_dir=tmp_path, port=0, open_browser=False, keep_alive=False)
+    session.configure(record_dir=tmp_path)
     x = XRay(session=session, record_dir=tmp_path)
     session.listeners.append(x.events.append)
     return x

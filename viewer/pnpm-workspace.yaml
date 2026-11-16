@@ -1,0 +1,2 @@
+# Flat node_modules: works on drives that cannot hold symlinks or junctions.
+nodeLinker: hoisted

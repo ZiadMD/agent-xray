@@ -1,0 +1,27 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --color-void: #05060a;
+  --color-hud: #c9d1e0;
+  --color-cyan: #5ce1e6;
+  --color-amber: #ffd27a;
+  --color-violet: #a78bfa;
+  --color-ok: #7cffb2;
+  --color-err: #ff4d6d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-void);
+  color: var(--color-hud);
+  -webkit-font-smoothing: antialiased;
+}

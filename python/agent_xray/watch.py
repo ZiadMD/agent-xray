@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 import logging
+import os
+import sys
+import threading
+import time
 import uuid
+import webbrowser
 from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +21,7 @@ from langchain_core.callbacks import BaseCallbackHandler, BaseCallbackManager
 from .collector import Collector, build_topology
 from .recorder import Recorder
 from .schema import Event, GraphTopology
+from .server import EventBus, ViewerServer, create_app
 
 log = logging.getLogger("agent_xray")
 
@@ -27,31 +34,63 @@ _SUBGRAPH_SENSITIVE_MODES = {"messages", "tools"}
 
 
 class Session:
-    """Settings and event sinks shared by every watched graph in this process."""
+    """Recording, live viewer and event listeners shared by every watched graph in a process."""
 
     def __init__(self) -> None:
         self.recorder: Recorder | None = None
         self.listeners: list[Callable[[Event], None]] = []
-        self.port = 7777
-        self.open_browser = True
-        self.keep_alive = False
+        self.bus = EventBus()
+        self.server: ViewerServer | None = None
+        self._lock = threading.Lock()
+        self._holding_open = False
 
-    def configure(
-        self, *, record_dir: str | Path | None, port: int, open_browser: bool, keep_alive: bool
-    ) -> None:
-        self.port = port
-        self.open_browser = open_browser
-        self.keep_alive = keep_alive
+    def configure(self, *, record_dir: str | Path | None) -> None:
         if record_dir is None:
             self.recorder = None
         elif self.recorder is None or self.recorder.record_dir != Path(record_dir):
             self.recorder = Recorder(record_dir)
 
+    def record_dir(self) -> Path | None:
+        return self.recorder.record_dir if self.recorder else None
+
     def emit(self, event: Event) -> None:
         if self.recorder is not None:
             self.recorder.write(event)
+        self.bus.publish(event)
         for listener in list(self.listeners):
             listener(event)
+
+    def start_viewer(
+        self, *, port: int, open_browser: bool, keep_alive: bool, wait_for_tab: float = 5.0
+    ) -> str:
+        """Start the viewer server once per process (later calls reuse it)."""
+        with self._lock:
+            if self.server is None:
+                server = ViewerServer(create_app(self.bus, self.record_dir), port=port)
+                url = server.start()
+                self.server = server
+                print(f"Agent X-Ray viewer: {url}", file=sys.stderr)
+                if open_browser and not os.environ.get("CI") and webbrowser.open(url):
+                    # let the new tab connect, so it shows the run from its first event
+                    self.bus.client_connected.wait(wait_for_tab)
+            if keep_alive and not self._holding_open:
+                self._holding_open = True
+                atexit.register(self._hold_open)
+            return self.server.url
+
+    def _hold_open(self) -> None:
+        """atexit hook for keep_alive: keep the viewer up after the script ends."""
+        if self.server is None:
+            return
+        print(
+            f"Agent X-Ray: viewer still running at {self.server.url}. Press Ctrl+C to exit.",
+            file=sys.stderr,
+        )
+        try:
+            while self.server.is_running:
+                time.sleep(0.25)
+        except KeyboardInterrupt:
+            pass
 
 
 SESSION = Session()
@@ -282,7 +321,7 @@ def _feed(collector: Collector, ns: tuple[str, ...], mode: str, data: Any) -> No
 def watch(
     graph: Any,
     *,
-    port: int = 7777,
+    port: int | None = 7777,
     open_browser: bool = True,
     record_dir: str | Path | None = "./xray_runs",
     keep_alive: bool = False,
@@ -290,18 +329,26 @@ def watch(
     """Watch a compiled LangGraph graph.
 
     Returns a proxy with the same ``invoke``/``ainvoke``/``stream``/``astream`` behaviour.
-    Every run is recorded to ``record_dir`` as JSONL (pass ``None`` to disable recording).
 
-    ``port``, ``open_browser`` and ``keep_alive`` configure the live viewer.
+    Args:
+        graph: a compiled LangGraph graph. It is wrapped, never modified.
+        port: where the live viewer is served (the next free port is used if it is taken).
+            ``None`` disables the viewer.
+        open_browser: open the viewer in a browser tab the first time it starts.
+        record_dir: every run is saved there as JSONL. ``None`` disables recording.
+        keep_alive: keep the process (and viewer) running after the script ends,
+            until Ctrl+C, so the run can be explored.
     """
     if isinstance(graph, WatchedGraph):
         graph = graph.wrapped
     for method in ("stream", "astream", "invoke", "get_graph", "get_name"):
         if not callable(getattr(graph, method, None)):
-            raise TypeError(
-                f"watch() expects a compiled LangGraph graph, got {type(graph).__name__}"
-            )
-    SESSION.configure(
-        record_dir=record_dir, port=port, open_browser=open_browser, keep_alive=keep_alive
-    )
+            kind = type(graph).__name__
+            raise TypeError(f"watch() expects a compiled LangGraph graph, got {kind}")
+    SESSION.configure(record_dir=record_dir)
+    if port is not None:
+        try:
+            SESSION.start_viewer(port=port, open_browser=open_browser, keep_alive=keep_alive)
+        except (OSError, RuntimeError) as exc:  # the graph must still run without a viewer
+            log.warning("agent_xray: the viewer could not start: %s", exc)
     return WatchedGraph(graph, SESSION)

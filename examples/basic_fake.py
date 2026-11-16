@@ -4,9 +4,11 @@ A small LangGraph app driven by scripted fake chat models. It has everything X-R
 a tool call, a conditional loop (writer <-> critic), a subgraph (research: search -> summarize),
 a custom stream event and a node that raises (it fails once, then succeeds on retry).
 
-    uv run python examples/basic_fake.py            # normal run
+    uv run python examples/basic_fake.py            # opens the viewer, stays up until Ctrl+C
     uv run python examples/basic_fake.py --crash    # the publish node keeps failing: the run errors
-    uv run python examples/basic_fake.py --fast     # no artificial delays (used by the tests)
+    uv run python examples/basic_fake.py --fast     # no artificial delays
+    uv run python examples/basic_fake.py --exit     # exit when the run ends
+    uv run python examples/basic_fake.py --no-viewer --exit   # record only
 """
 
 from __future__ import annotations
@@ -249,13 +251,20 @@ def main() -> None:
     parser.add_argument("--crash", action="store_true", help="make the publish node always fail")
     parser.add_argument("--fast", action="store_true", help="no artificial delays")
     parser.add_argument("--record-dir", default="./xray_runs")
+    parser.add_argument("--port", type=int, default=7777)
+    parser.add_argument("--no-viewer", action="store_true", help="record only, no live viewer")
+    parser.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    parser.add_argument("--exit", action="store_true", help="exit when the run ends")
     args = parser.parse_args()
     if args.fast:
         _DELAY_SCALE = 0.0
 
     graph = watch(
         build_graph(crash=args.crash, delay=0.0 if args.fast else 0.04),
+        port=None if args.no_viewer else args.port,
+        open_browser=not args.no_browser,
         record_dir=args.record_dir,
+        keep_alive=not args.exit,
     )
     try:
         result = graph.invoke(INPUT)
