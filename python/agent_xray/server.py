@@ -34,6 +34,7 @@ log = logging.getLogger("agent_xray")
 
 STATIC_DIR = Path(__file__).parent / "static"
 _BATCH = 512  # max events per WebSocket message
+SYNC_MESSAGE = '{"sync":true}'
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
@@ -199,6 +200,8 @@ def create_app(bus: EventBus, record_dir: Callable[[], Path | None]) -> FastAPI:
         try:
             for i in range(0, len(backlog), _BATCH):
                 await ws.send_text(_frame(backlog[i : i + _BATCH]))
+            # tells the viewer that everything before this was history, not live
+            await ws.send_text(SYNC_MESSAGE)
             sender = asyncio.create_task(_send_forever(ws, client))
             receiver = asyncio.create_task(_drain_incoming(ws))
             done, pending = await asyncio.wait(

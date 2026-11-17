@@ -1,3 +1,4 @@
+import { Stats } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { useTuning } from '@tuning'
 import { useMemo } from 'react'
@@ -8,6 +9,9 @@ import { CameraRig } from './CameraRig'
 import { Effects } from './Effects'
 import { GraphView } from './GraphView'
 import { StarDust } from './StarDust'
+
+// ?stats shows an FPS / frame-time panel
+const SHOW_STATS = new URLSearchParams(location.search).has('stats')
 
 const DEFAULT_EXTENT: [number, number, number] = [10, 6, 6]
 
@@ -32,6 +36,7 @@ export function Scene({ topology }: { topology: GraphTopology | null }) {
         {graph && layout && <GraphView key={key} topology={graph} layout={layout} />}
         <CameraRig extent={layout?.extent ?? DEFAULT_EXTENT} fitKey={key} />
         <Effects />
+        {SHOW_STATS && <Stats />}
       </TuningContext>
     </Canvas>
   )

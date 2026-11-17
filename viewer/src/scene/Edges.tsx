@@ -5,12 +5,10 @@ import * as THREE from 'three'
 import type { Line2 } from 'three-stdlib'
 import type { GraphEdge } from '../types/events'
 import { useTuningValue } from '../tuning/context'
-import { edgeControlPoint, useLiveGraph } from './liveGraph'
+import { edgeControlPoint, edgeKey, useLiveGraph } from './liveGraph'
 import { NODE_RADIUS } from './NodeOrb'
 
 const mid = new THREE.Vector3()
-
-export const edgeKey = (e: { source: string; target: string }) => `${e.source}→${e.target}`
 
 /** Faint curved lines for the graph's edges (dashed when conditional). */
 export function Edges({ edges }: { edges: GraphEdge[] }) {
@@ -18,6 +16,9 @@ export function Edges({ edges }: { edges: GraphEdge[] }) {
   const tuning = useTuningValue()
   const lines = useRef(new Map<string, QuadraticBezierLineRef>())
   const settled = useRef(false)
+  const lit = useRef(new Set<string>())
+  const baseColor = useMemo(() => new THREE.Color(tuning.edge), [tuning.edge])
+  const litColor = useMemo(() => new THREE.Color(tuning.active), [tuning.active])
 
   const drawable = useMemo(
     () =>
@@ -43,6 +44,26 @@ export function Edges({ edges }: { edges: GraphEdge[] }) {
   }, [drawable, live])
 
   useFrame(() => {
+    // edges light up while a packet flies along them, then fade back
+    for (const [key, glow] of live.edgeGlow) {
+      const line = lines.current.get(key)
+      if (!line) continue
+      lit.current.add(key)
+      line.material.color.copy(baseColor).lerp(litColor, glow.value)
+      line.material.opacity = tuning.edgeOpacity + (0.95 - tuning.edgeOpacity) * glow.value
+      line.material.linewidth = 1.15 + 1.6 * glow.value
+    }
+    for (const key of lit.current) {
+      if (live.edgeGlow.has(key)) continue
+      const line = lines.current.get(key)
+      if (line) {
+        line.material.color.copy(baseColor)
+        line.material.opacity = tuning.edgeOpacity
+        line.material.linewidth = 1.15
+      }
+      lit.current.delete(key)
+    }
+
     if (settled.current && !live.entering) return
     for (const e of drawable) {
       const line = lines.current.get(edgeKey(e))

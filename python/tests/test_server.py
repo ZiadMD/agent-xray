@@ -18,6 +18,12 @@ import basic_fake
 from conftest import XRay
 
 
+def _events(raw: str) -> list[dict]:
+    """Events in one WebSocket message ({"sync": true} markers carry none)."""
+    data = json.loads(raw)
+    return data if isinstance(data, list) else []
+
+
 def _run_into(session: Session) -> None:
     WatchedGraph(basic_fake.build_graph(), session).invoke(basic_fake.INPUT)
 
@@ -73,6 +79,7 @@ def test_websocket_backlog_then_live() -> None:
     with client.websocket_connect("/ws") as ws:
         backlog = json.loads(ws.receive_text())
         assert isinstance(backlog, list)
+        assert json.loads(ws.receive_text()) == {"sync": True}  # end of history
         assert backlog[0]["type"] == "run_start" and backlog[-1]["type"] == "run_end"
         assert [e["seq"] for e in backlog] == list(range(len(backlog)))
 
@@ -80,7 +87,7 @@ def test_websocket_backlog_then_live() -> None:
         worker.start()
         live: list[dict] = []
         while not live or live[-1]["type"] != "run_end":
-            live.extend(json.loads(ws.receive_text()))
+            live.extend(_events(ws.receive_text()))
         worker.join()
     assert live[0]["type"] == "run_start"
     assert live[0]["run_id"] != backlog[0]["run_id"]
@@ -109,7 +116,7 @@ def test_background_server(tmp_path: Path) -> None:
             worker.start()
             events: list[dict] = []
             while not events or events[-1]["type"] != "run_end":
-                events.extend(json.loads(ws.recv(timeout=10)))
+                events.extend(_events(ws.recv(timeout=10)))
             worker.join()
         assert events[0]["type"] == "run_start"
         assert events[-1]["data"]["status"] == "ok"

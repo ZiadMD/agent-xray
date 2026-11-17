@@ -33,6 +33,9 @@ XRAY_MODES = ("updates", "custom", "tasks")
 _SUBGRAPH_SENSITIVE_MODES = {"messages", "tools"}
 
 
+INTRO_SECONDS = 1.2  # the viewer's entrance animation, so the first events are not missed
+
+
 class Session:
     """Recording, live viewer and event listeners shared by every watched graph in a process."""
 
@@ -70,9 +73,10 @@ class Session:
                 url = server.start()
                 self.server = server
                 print(f"Agent X-Ray viewer: {url}", file=sys.stderr)
-                if open_browser and not os.environ.get("CI") and webbrowser.open(url):
-                    # let the new tab connect, so it shows the run from its first event
-                    self.bus.client_connected.wait(wait_for_tab)
+                opened = open_browser and not os.environ.get("CI") and webbrowser.open(url)
+                # let the new tab connect and the graph bloom in before the run starts
+                if opened and self.bus.client_connected.wait(wait_for_tab):
+                    time.sleep(INTRO_SECONDS)
             if keep_alive and not self._holding_open:
                 self._holding_open = True
                 atexit.register(self._hold_open)

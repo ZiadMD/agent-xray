@@ -3,8 +3,11 @@ import { useState } from 'react'
 import type { Layout } from '../layout/layout'
 import type { GraphTopology } from '../types/events'
 import { Edges } from './Edges'
+import { EventDriver } from './EventDriver'
 import { clamp01, createLiveGraph, easeOutCubic, LiveGraphContext, useLiveGraph } from './liveGraph'
 import { NodeOrb } from './NodeOrb'
+import { Packets } from './Packets'
+import { Sparks } from './Sparks'
 import { SubgraphShell } from './SubgraphShell'
 
 /** The constellation for one topology: subgraph shells, edges and node orbs. */
@@ -17,6 +20,7 @@ export function GraphView({ topology, layout }: { topology: GraphTopology; layou
     <LiveGraphContext value={live}>
       {/* first child: its frame callback runs before the ones that read positions */}
       <EntranceAnimator />
+      <EventDriver />
       {shells.map((n) => {
         const bounds = live.layout.subgraphs.get(n.id)
         return bounds && <SubgraphShell key={n.id} node={n} bounds={bounds} />
@@ -25,6 +29,8 @@ export function GraphView({ topology, layout }: { topology: GraphTopology; layou
       {drawable.map((n) => (
         <NodeOrb key={n.id} node={n} />
       ))}
+      <Packets />
+      <Sparks />
     </LiveGraphContext>
   )
 }
