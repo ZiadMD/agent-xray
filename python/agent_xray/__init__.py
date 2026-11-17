@@ -8,4 +8,4 @@ graph.invoke({...})
 from .watch import WatchedGraph, watch
 
 __all__ = ["WatchedGraph", "watch"]
-__version__ = "0.1.0"
+__version__ = "0.1.1"

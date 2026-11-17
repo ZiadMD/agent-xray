@@ -64,6 +64,13 @@ uv run python examples/crew/run.py --fake   # the demo crew with scripted models
 
 The demo crew (`examples/crew`) is a supervisor that researches and writes the LinkedIn post announcing this tool: `supervisor → researcher (search → summarize) → writer ⇄ critic → editor`. With keys it uses Groq with a Gemini Flash fallback (`uv run --group crew python examples/crew/run.py`, see `examples/crew/.env.example`).
 
+Two bigger agents on real models (a `GROQ_API_KEY` in `examples/crew/.env` or `examples/showcase/.env`, free tier is enough):
+
+```bash
+uv run --group crew python examples/showcase/swarm.py    # planner → 3 scout sub-agents (web, arXiv, GitHub search) in parallel → synthesizer ⇄ fact checker → writer
+uv run --group crew python examples/showcase/bugfix.py   # fixes a real buggy module against a real pytest suite, with a reviewer in the loop
+```
+
 ## How it works
 
 ```
