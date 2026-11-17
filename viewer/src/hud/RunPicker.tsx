@@ -40,7 +40,7 @@ export function RunPicker() {
         {open ? 'hide runs' : 'runs'}
       </button>
       {open && (
-        <div className="flex max-h-[min(18rem,calc(100vh-24rem))] flex-col overflow-y-auto rounded-lg border border-hud/10 bg-void/70 backdrop-blur-sm">
+        <div className="flex max-h-[max(9rem,min(18rem,calc(100vh-24rem)))] flex-col overflow-y-auto rounded-lg border border-hud/10 bg-void/70 backdrop-blur-sm">
           {recordings === null && <span className="p-3 text-xs text-hud/50">loading…</span>}
           {recordings?.length === 0 && (
             <span className="p-3 text-xs text-hud/50">No recordings found. Run a watched graph first.</span>

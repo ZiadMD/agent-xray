@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 from websockets.sync.client import connect
 
@@ -16,6 +17,9 @@ from agent_xray.watch import Session, WatchedGraph
 
 import basic_fake
 from conftest import XRay
+
+# the test client always sends "Host: testserver" on WebSocket handshakes
+LOCAL = {"host": "localhost"}
 
 
 def _events(raw: str) -> list[dict]:
@@ -42,7 +46,9 @@ def test_bus_keeps_running_and_latest_finished_runs() -> None:
 
 def test_runs_api(xray: XRay) -> None:
     xray.wrap(basic_fake.build_graph()).invoke(basic_fake.INPUT)
-    client = TestClient(create_app(EventBus(), lambda: xray.record_dir))
+    client = TestClient(
+        create_app(EventBus(), lambda: xray.record_dir), base_url="http://localhost"
+    )
     runs = client.get("/api/runs").json()
     assert len(runs) == 1
     run = runs[0]
@@ -75,8 +81,8 @@ def test_runs_api_lists_running_and_skips_garbage(tmp_path: Path) -> None:
 def test_websocket_backlog_then_live() -> None:
     session = Session()
     _run_into(session)  # finished before the tab connects
-    client = TestClient(create_app(session.bus, lambda: None))
-    with client.websocket_connect("/ws") as ws:
+    client = TestClient(create_app(session.bus, lambda: None), base_url="http://localhost")
+    with client.websocket_connect("/ws", headers=LOCAL) as ws:
         backlog = json.loads(ws.receive_text())
         assert isinstance(backlog, list)
         assert json.loads(ws.receive_text()) == {"sync": True}  # end of history
@@ -98,7 +104,7 @@ def test_fallback_page_when_viewer_is_not_built(monkeypatch, tmp_path: Path) -> 
     import agent_xray.server as server
 
     monkeypatch.setattr(server, "STATIC_DIR", tmp_path / "no-viewer")
-    client = TestClient(create_app(EventBus(), lambda: None))
+    client = TestClient(create_app(EventBus(), lambda: None), base_url="http://localhost")
     page = client.get("/")
     assert page.status_code == 200 and "viewer has not been built" in page.text
 
@@ -164,3 +170,38 @@ def test_watch_without_viewer_starts_no_server(monkeypatch, tmp_path: Path) -> N
     graph.invoke(basic_fake.INPUT)
     assert session.server is None
     assert graph.last_recording is not None and graph.last_recording.is_file()
+
+
+def test_websocket_with_a_foreign_host_is_refused() -> None:
+    from starlette.testclient import WebSocketDenialResponse
+
+    client = TestClient(create_app(EventBus(), lambda: None), base_url="http://localhost")
+    attempt = client.websocket_connect("/ws", headers={"host": "evil.example"})
+    with pytest.raises(WebSocketDenialResponse), attempt:
+        pass
+
+
+def test_foreign_hosts_are_rejected() -> None:
+    """DNS rebinding: a page on evil.example resolving to 127.0.0.1 must not read recordings."""
+    app = create_app(EventBus(), lambda: None)
+    assert TestClient(app, base_url="http://evil.example").get("/api/runs").status_code == 400
+    assert TestClient(app, base_url="http://127.0.0.1:7777").get("/api/runs").status_code == 200
+    assert TestClient(app, base_url="http://localhost:7777").get("/api/runs").status_code == 200
+
+
+def test_websocket_from_another_site_is_refused() -> None:
+    import pytest
+    from starlette.websockets import WebSocketDisconnect
+
+    client = TestClient(create_app(EventBus(), lambda: None), base_url="http://localhost")
+    foreign = {**LOCAL, "origin": "https://evil.example"}
+    attempt = client.websocket_connect("/ws", headers=foreign)
+    with pytest.raises(WebSocketDisconnect) as refused, attempt:
+        pass
+    assert refused.value.code == 1008  # policy violation
+    # the viewer's own page (and non-browser clients without an Origin) are fine
+    ok = {**LOCAL, "origin": "http://localhost:7777"}
+    with client.websocket_connect("/ws", headers=ok) as ws:
+        assert ws.receive_text()
+    with client.websocket_connect("/ws", headers=LOCAL) as ws:
+        assert ws.receive_text()

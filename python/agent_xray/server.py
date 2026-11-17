@@ -15,10 +15,11 @@ import re
 import socket
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 import orjson
 import uvicorn
@@ -26,6 +27,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .recorder import event_to_json
 from .schema import Event
@@ -34,6 +36,9 @@ log = logging.getLogger("agent_xray")
 
 STATIC_DIR = Path(__file__).parent / "static"
 _BATCH = 512  # max events per WebSocket message
+# The server only listens on the loopback interface, but a web page you visit could still reach
+# it from your own browser. Only these host names may be used to talk to it.
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "[::1]", "::1")
 SYNC_MESSAGE = '{"sync":true}'
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
@@ -176,9 +181,27 @@ _NOT_BUILT = """<!doctype html><html><head><meta charset="utf-8"><title>Agent X-
 <a style="color:#A78BFA" href="/api/runs">/api/runs</a>.</p></body></html>"""
 
 
-def create_app(bus: EventBus, record_dir: Callable[[], Path | None]) -> FastAPI:
-    """Build the FastAPI app. ``record_dir`` is read on each request (it may change)."""
+def _is_local_origin(origin: str | None) -> bool:
+    """Browsers send an Origin on WebSocket handshakes; pages of other sites must not read runs."""
+    if not origin:
+        return True  # not a browser page (scripts, tests): nothing to protect against
+    host = urlparse(origin).hostname or ""
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
+def create_app(
+    bus: EventBus,
+    record_dir: Callable[[], Path | None],
+    *,
+    allowed_hosts: Sequence[str] = LOCAL_HOSTS,
+) -> FastAPI:
+    """Build the FastAPI app. ``record_dir`` is read on each request (it may change).
+
+    Requests must use a local host name (this defeats DNS rebinding) and WebSocket handshakes
+    must come from a local page (this defeats cross-site WebSocket reads).
+    """
     app = FastAPI(title="Agent X-Ray", docs_url=None, redoc_url=None, openapi_url=None)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))
 
     @app.get("/api/runs")
     def get_runs() -> list[RunInfo]:
@@ -194,6 +217,9 @@ def create_app(bus: EventBus, record_dir: Callable[[], Path | None]) -> FastAPI:
 
     @app.websocket("/ws")
     async def websocket(ws: WebSocket) -> None:
+        if not _is_local_origin(ws.headers.get("origin")):
+            await ws.close(code=1008)  # policy violation
+            return
         await ws.accept()
         client = _Client(asyncio.get_running_loop())
         backlog = bus.attach(client)

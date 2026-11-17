@@ -25,3 +25,9 @@ body,
   color: var(--color-hud);
   -webkit-font-smoothing: antialiased;
 }
+
+/* dark, thin scrollbars for the panels */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(201 209 224 / 0.25) transparent;
+}

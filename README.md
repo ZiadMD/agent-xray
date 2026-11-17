@@ -100,6 +100,18 @@ cd viewer && pnpm build:demo             # replay-only static site into viewer/d
 
 The demo build is deployable as-is (Vercel: see `vercel.json`).
 
+## Privacy and security
+
+- The viewer server listens on `127.0.0.1` only, answers only to `localhost` / `127.0.0.1` host names (this blocks DNS rebinding) and refuses WebSocket connections from pages of other sites.
+- Recordings hold short previews of your data (inputs, outputs, tool arguments and results, truncated to 280 characters, with API-key-looking strings redacted). Redaction is pattern-based and not a guarantee: look at a recording before you share it.
+
+## Limitations
+
+- `watch()` does not add a `thread_id` for you: a graph with a checkpointer still needs one in its config, exactly as without X-Ray.
+- `stream_events` / `astream_events` are not watched yet (calls pass through unchanged).
+- Chat models are made to stream while a graph is watched (that is what makes live tokens possible), which can change message ids slightly compared with an unwatched run.
+- A second watched script started while another holds port 7777 opens its own viewer on the next free port.
+
 ## Roadmap
 
 - Adapters for other frameworks (the collector is kept separate for this)
