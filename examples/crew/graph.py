@@ -61,7 +61,7 @@ def _duckduckgo(query: str) -> list[tuple[str, str]]:
     for text in (query, "LangGraph observability"):
         for backend in ("auto", "bing"):
             try:
-                found = DDGS().text(text, max_results=4, backend=backend)
+                found = DDGS(timeout=5).text(text, max_results=4, backend=backend)
                 if found:
                     return [(r["title"], r["body"]) for r in found]
             except Exception as exc:
@@ -150,8 +150,9 @@ def build_graph(
     def summarize(state: CrewState) -> dict[str, Any]:
         notes = _ask(
             summarize_llm,
-            "You are a research assistant. Reply with 4 short bullet points a writer can use. "
-            "Facts only, no preamble.",
+            "You are a research assistant. Reply with 4 short bullet points about the PROBLEM: why "
+            "agent graphs are hard to observe and debug. Do not describe or recommend any specific "
+            "tool or product. Facts only, no preamble.",
             f"Topic: {state['topic']}\n\nSearch results:\n{state['results']}",
         )
         return {"notes": notes}
@@ -182,7 +183,10 @@ def build_graph(
         draft = _ask(
             writer_llm,
             "You write LinkedIn posts for developers. Plain, concrete, no hype, no hashtag walls. "
-            "700-1300 characters. Output only the post.",
+            "700-1300 characters. Output only the post. Every claim about Agent X-Ray must come from "
+            "the Product description. The research notes are background on the problem only: never "
+            "attribute integrations, protocols, exports or features to Agent X-Ray unless the "
+            "Product description says so.",
             f"Angle: {state.get('plan', '')}\n\nProduct:\n{PRODUCT}\n\nResearch notes:\n"
             f"{state.get('notes', '')}{feedback}",
         )

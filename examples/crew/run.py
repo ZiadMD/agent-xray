@@ -20,7 +20,7 @@ from graph import build_graph, make_search_tool  # noqa: E402
 
 from agent_xray import watch  # noqa: E402
 
-DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_TOPIC = "Announcing Agent X-Ray: watch any LangGraph app think, live"
 
@@ -68,6 +68,8 @@ def main() -> None:
     parser.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
     parser.add_argument("--exit", action="store_true", help="exit when the run ends")
     args = parser.parse_args()
+    # model output has characters (narrow spaces, quotes) the Windows console cannot encode
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
     if args.fake:
         from fakes import fake_models
