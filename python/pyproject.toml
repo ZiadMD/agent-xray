@@ -8,6 +8,7 @@ license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [{ name = "Agent X-Ray contributors" }]
 keywords = ["langgraph", "langchain", "agents", "observability", "visualization", "3d"]
+urls = { Homepage = "https://github.com/ZiadMD/agent-xray", Issues = "https://github.com/ZiadMD/agent-xray/issues" }
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

@@ -54,7 +54,7 @@ Viewer keys: `Space` play/pause · `←` `→` step · `R` restart · `C` cinema
 ## Try it
 
 ```bash
-git clone <this repo> && cd agent-xray
+git clone https://github.com/ZiadMD/agent-xray && cd agent-xray
 uv sync
 uv run python examples/basic_fake.py        # no API keys: a loop, a tool, a subgraph, a failing node
 uv run python examples/crew/run.py --fake   # the demo crew with scripted models
