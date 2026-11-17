@@ -29,7 +29,8 @@ def real_models() -> dict[str, Any]:
     """Groq as the primary model (fast streams), Gemini Flash as the fallback."""
     from dotenv import load_dotenv
 
-    load_dotenv(Path(__file__).resolve().parent / ".env")
+    # override: a key in examples/crew/.env wins over a stale one in the shell environment
+    load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
     if not os.environ.get("GROQ_API_KEY"):
         raise SystemExit("GROQ_API_KEY is not set (see examples/crew/.env.example), or use --fake")
 
