@@ -45,6 +45,12 @@ export interface Shockwave {
   shaken: boolean
 }
 
+/**
+ * What the cinematic camera should look at: the most recently activated node that is still
+ * working. Written by the event driver, read by the camera rig.
+ */
+export const cinemaFocus = { id: null as string | null, pos: new THREE.Vector3(), idleSince: 0 }
+
 /** Screen shake, 0 → 1. Written by the event driver, applied by the camera. */
 export const shake = { trauma: 0 }
 

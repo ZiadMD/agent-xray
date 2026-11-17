@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { sim } from '../store/viewer'
+import { playhead, sim } from '../store/viewer'
 import type { SimState } from '../sim/reducer'
 
 /**
@@ -18,15 +18,12 @@ export function useSimSnapshot(hz = 8): SimState {
   return snapshot
 }
 
-/** Run time in ms: ticks while the run is going, otherwise the final duration. */
-export function useRunClock(running: boolean, finalMs: number | null): number {
-  const [now, setNow] = useState(0)
+/** The playhead in ms, sampled a few times a second for text (the scrubber reads it directly). */
+export function usePlayheadClock(hz = 10): number {
+  const [t, setT] = useState(playhead.t)
   useEffect(() => {
-    if (!running) return
-    const id = setInterval(() => setNow(performance.now()), 100)
+    const id = setInterval(() => setT(playhead.t), 1000 / hz)
     return () => clearInterval(id)
-  }, [running])
-  if (!running) return finalMs ?? sim.state.t
-  // the latest event's run time plus the wall time since it arrived
-  return sim.anchor.t + Math.max(0, (now || performance.now()) - sim.anchor.wall)
+  }, [hz])
+  return t
 }

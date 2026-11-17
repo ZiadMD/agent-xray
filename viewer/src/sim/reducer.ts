@@ -1,4 +1,4 @@
-import type { XRayEvent } from '../types/events'
+import type { RunStatus, Totals, XRayEvent } from '../types/events'
 
 export type NodeStatus = 'idle' | 'running' | 'done' | 'error'
 
@@ -16,6 +16,10 @@ export interface NodeState {
   error: string | null
   toolCalls: number
   errors: number
+  totalDurationMs: number
+  /** Previews of what the latest activation received and returned. */
+  lastInput: string | null
+  lastOutput: string | null
 }
 
 export interface ModelUsage {
@@ -50,6 +54,10 @@ export interface ToolCall {
 export interface SimState {
   runId: string | null
   finished: boolean
+  /** 'idle' before any run; the final status once run_end has been applied. */
+  status: RunStatus | 'idle' | 'running'
+  /** The totals reported by run_end (null until then). */
+  final: Totals | null
   /** Run time of the last applied event, in ms. */
   t: number
   nodes: ReadonlyMap<string, NodeState>
@@ -69,11 +77,16 @@ const IDLE: NodeState = {
   error: null,
   toolCalls: 0,
   errors: 0,
+  totalDurationMs: 0,
+  lastInput: null,
+  lastOutput: null,
 }
 
 export const emptyState = (): SimState => ({
   runId: null,
   finished: false,
+  status: 'idle',
+  final: null,
   t: 0,
   nodes: new Map(),
   tools: new Map(),
@@ -106,7 +119,7 @@ function patch(
  * begins a new run.
  */
 export function applyEvent(state: SimState, event: XRayEvent): SimState {
-  if (event.type === 'run_start') return { ...emptyState(), runId: event.run_id }
+  if (event.type === 'run_start') return { ...emptyState(), runId: event.run_id, status: 'running' }
   if (event.run_id !== state.runId) return state
 
   switch (event.type) {
@@ -116,6 +129,7 @@ export function applyEvent(state: SimState, event: XRayEvent): SimState {
         status: 'running',
         running: n.running + 1,
         error: null,
+        lastInput: event.data.input_preview ?? n.lastInput,
       }))
     case 'node_end': {
       const failed = event.data.error !== null
@@ -126,6 +140,8 @@ export function applyEvent(state: SimState, event: XRayEvent): SimState {
           running,
           runs: n.runs + 1,
           lastDurationMs: event.data.duration_ms,
+          totalDurationMs: n.totalDurationMs + event.data.duration_ms,
+          lastOutput: event.data.output_preview,
           error: failed ? event.data.error : n.error,
           status: running > 0 ? 'running' : failed ? 'error' : 'done',
         }
@@ -196,7 +212,13 @@ export function applyEvent(state: SimState, event: XRayEvent): SimState {
       return { ...patch(state, event, node, (n) => ({ ...n, errors: n.errors + 1 })), totals }
     }
     case 'run_end':
-      return { ...state, t: event.t, finished: true }
+      return {
+        ...state,
+        t: event.t,
+        finished: true,
+        status: event.data.status,
+        final: event.data.totals,
+      }
     default:
       return { ...state, t: event.t }
   }

@@ -4,6 +4,7 @@ import { useTuning } from '@tuning'
 import { useMemo } from 'react'
 import { computeLayout, topologyKey } from '../layout/layout'
 import type { GraphTopology } from '../types/events'
+import { RECORD_MODE, useViewer } from '../store/viewer'
 import { TuningContext } from '../tuning/context'
 import { CameraRig } from './CameraRig'
 import { Effects } from './Effects'
@@ -27,7 +28,8 @@ export function Scene({ topology }: { topology: GraphTopology | null }) {
 
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={RECORD_MODE ? 1 : [1, 2]}
+      onPointerMissed={() => useViewer.getState().select(null)}
       gl={{ antialias: false, powerPreference: 'high-performance', stencil: false }}
       camera={{ fov: 42, near: 0.1, far: 600, position: [0, 8, 40] }}
     >
@@ -38,7 +40,7 @@ export function Scene({ topology }: { topology: GraphTopology | null }) {
         <CameraRig extent={layout?.extent ?? DEFAULT_EXTENT} fitKey={key} />
         <Shake />
         <Effects />
-        {SHOW_STATS && <Stats />}
+        {SHOW_STATS && !RECORD_MODE && <Stats />}
       </TuningContext>
     </Canvas>
   )

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { GraphNode } from '../types/events'
 import { useTuningValue } from '../tuning/context'
+import { useViewer } from '../store/viewer'
 import { Label } from './Label'
 import { easeOutCubic, phaseOf, useLiveGraph } from './liveGraph'
 import { createOrbMaterial, getGlowTexture } from './materials'
@@ -19,6 +20,7 @@ export function NodeOrb({ node }: { node: GraphNode }) {
   const group = useRef<THREE.Group>(null)
   const halo = useRef<THREE.Sprite>(null)
   const ring = useRef<THREE.Mesh>(null)
+  const pick = useRef<THREE.Mesh>(null)
   const terminal = node.kind === 'start' || node.kind === 'end'
   const radius = terminal ? TERMINAL_RADIUS : NODE_RADIUS
   const phase = phaseOf(node.id)
@@ -72,7 +74,7 @@ export function NodeOrb({ node }: { node: GraphNode }) {
     [material, haloMaterial],
   )
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera }) => {
     const g = group.current
     if (!g) return
     const fx = live.fx.get(node.id)
@@ -102,6 +104,17 @@ export function NodeOrb({ node }: { node: GraphNode }) {
       halo_.scale.setScalar(radius * 6 * (1 + 0.45 * a))
     }
 
+    // selected in the inspector: a thin ring facing the camera
+    const selected = useViewer.getState().selected === node.id
+    const pick_ = pick.current
+    if (pick_) {
+      pick_.visible = selected
+      if (selected) {
+        pick_.quaternion.copy(camera.quaternion)
+        pick_.scale.setScalar(radius * (1 + 0.04 * Math.sin(t * 3)))
+      }
+    }
+
     // a ring expands from the node when it starts working
     const ring_ = ring.current
     if (ring_) {
@@ -118,6 +131,27 @@ export function NodeOrb({ node }: { node: GraphNode }) {
 
   return (
     <group ref={group}>
+      {/* a generous invisible target, so small and terminal nodes are easy to click */}
+      <mesh
+        onClick={(e) => {
+          e.stopPropagation()
+          useViewer.getState().select(node.id)
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation()
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = ''
+        }}
+      >
+        <sphereGeometry args={[radius * 2, 16, 12]} />
+        <meshBasicMaterial visible={false} />
+      </mesh>
+      <mesh ref={pick} visible={false}>
+        <ringGeometry args={[1.5, 1.58, 64]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.7} depthWrite={false} toneMapped={false} />
+      </mesh>
       <mesh material={material}>
         <sphereGeometry args={[radius, 48, 32]} />
       </mesh>

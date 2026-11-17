@@ -214,6 +214,50 @@ def cmd_tail(args: argparse.Namespace) -> int:
     return 0
 
 
+def _open_and_hold(url: str, open_browser: bool, what: str) -> None:
+    import threading
+    import webbrowser
+
+    print(f"{what}: {url}  (Ctrl+C to stop)")
+    if open_browser:
+        threading.Thread(target=webbrowser.open, args=(url,), daemon=True).start()
+    try:
+        while True:
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        pass
+
+
+def start_viewer(directory: Path, port: int):  # type: ignore[no-untyped-def]
+    """Serve the viewer over a directory of recordings (no live events)."""
+    from .server import EventBus, ViewerServer, create_app
+
+    server = ViewerServer(create_app(EventBus(), lambda: directory), port=port)
+    server.start()
+    return server
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    directory = Path(args.dir)
+    if not directory.is_dir():
+        raise SystemExit(f"xray: {directory} is not a directory")
+    server = start_viewer(directory, args.port)
+    _open_and_hold(server.url, not args.no_browser, f"Agent X-Ray: browsing {directory}")
+    server.stop()
+    return 0
+
+
+def cmd_replay(args: argparse.Namespace) -> int:
+    path = Path(args.file)
+    if not path.is_file():
+        raise SystemExit(f"xray: {path} does not exist")
+    server = start_viewer(path.resolve().parent, args.port)
+    url = f"{server.url}/?run={path.stem}"
+    _open_and_hold(url, not args.no_browser, f"Agent X-Ray: replaying {path.name}")
+    server.stop()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="xray", description="Agent X-Ray command line.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -229,6 +273,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     tail.add_argument("--no-color", action="store_true", help="disable colors")
     tail.set_defaults(func=cmd_tail)
+
+    serve = sub.add_parser("serve", help="serve the viewer to browse past recordings")
+    serve.add_argument(
+        "--dir", default="./xray_runs", help="recordings directory (default: ./xray_runs)"
+    )
+    serve.add_argument("--port", type=int, default=7777)
+    serve.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    serve.set_defaults(func=cmd_serve)
+
+    replay = sub.add_parser("replay", help="open the viewer in replay mode for a recording")
+    replay.add_argument("file", help="a .jsonl recording")
+    replay.add_argument("--port", type=int, default=7777)
+    replay.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    replay.set_defaults(func=cmd_replay)
     return parser
 
 

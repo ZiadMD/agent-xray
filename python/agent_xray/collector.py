@@ -337,7 +337,9 @@ class Collector:
 
     # --- node tasks (callbacks) ---------------------------------------------
 
-    def chain_start(self, run_id: UUID, metadata: dict[str, Any] | None) -> None:
+    def chain_start(
+        self, run_id: UUID, metadata: dict[str, Any] | None, inputs: Any = None
+    ) -> None:
         with self._lock:
             md = metadata or {}
             if self._root_run is None:
@@ -369,7 +371,10 @@ class Collector:
                     self._entry_sources[task.path] = sources  # its first child draws the edge
                 else:
                     self._emit_edges(sources, task.node, task.ns)
-            self._emit(NodeStartEvent, NodeStartData(task_id=task.task_id, node=task.node), task.ns)
+            data = NodeStartData(
+                task_id=task.task_id, node=task.node, input_preview=pv.preview(inputs)
+            )
+            self._emit(NodeStartEvent, data, task.ns)
 
     def _end_task(self, task: _Task, *, output: Any = None, error: str | None = None) -> None:
         self._active_paths.discard(NS_SEP.join(task.path))
@@ -598,7 +603,7 @@ class XRayCallbackHandler(BaseCallbackHandler):
         metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        self.collector.chain_start(run_id, metadata)
+        self.collector.chain_start(run_id, metadata, inputs)
 
     def on_chain_end(self, outputs: Any, *, run_id: UUID, **kwargs: Any) -> None:
         self.collector.chain_end(run_id, outputs)

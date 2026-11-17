@@ -29,3 +29,17 @@ Per-frame animation never goes through React state: components mutate refs in `u
 
 `node_modules` is flat (`nodeLinker: hoisted` in `pnpm-workspace.yaml`) so installs also work on
 drives that cannot hold symlinks.
+
+## Replay, timeline and recording
+
+- `xray serve [--dir ./xray_runs]` browses recordings (the run picker opens when nothing is live);
+  `xray replay <file.jsonl>` opens one and plays it.
+- Bottom bar: play/pause, step to the previous/next event (token chunks are skipped), speed
+  0.25×–4×, and a scrubber with one lane per node (red = failures and errors). Dragging it on a
+  live run switches to replay; `live` returns to following the run.
+- Click a node for the inspector (status, durations, tokens, last input/output, tool calls).
+- Keys: `Space` play/pause · `←`/`→` step · `R` restart · `C` cinematic camera · `H` hide the HUD · `Esc` deselect.
+- `?record=1` (add `&run=<id>` to replay a recording): fixed 1080×1350 frame (scaled down to fit the
+  window), hidden cursor, minimal HUD, cinematic camera, auto-play.
+- `?stats` shows an FPS panel and exposes `window.__xray` for debugging.
+- Tests: `pnpm test` (vitest; the reducer, timeline helpers and playback actions).

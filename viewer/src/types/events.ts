@@ -48,7 +48,11 @@ export type RunStartEvent = Envelope<
     meta: { graph_name: string; langgraph_version: string }
   }
 >
-export type NodeStartEvent = Envelope<'node_start', { task_id: string; node: string }>
+export type NodeStartEvent = Envelope<
+  'node_start',
+  // input_preview is missing in recordings made before it was added
+  { task_id: string; node: string; input_preview?: string }
+>
 export type NodeEndEvent = Envelope<
   'node_end',
   { task_id: string; node: string; duration_ms: number; output_preview: string; error: string | null }

@@ -1,8 +1,19 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
-import { effectCursor, eventLog, sim } from '../store/viewer'
+import { applyEvent } from '../sim/reducer'
+import { countAtOrBefore } from '../sim/timeline'
+import { effectCursor, eventLog, playhead, sim, useViewer } from '../store/viewer'
 import type { XRayEvent } from '../types/events'
-import { createNodeFx, edgeKey, phaseOf, shake, useLiveGraph, type LiveGraph, type NodeFx } from './liveGraph'
+import {
+  cinemaFocus,
+  createNodeFx,
+  edgeKey,
+  phaseOf,
+  shake,
+  useLiveGraph,
+  type LiveGraph,
+  type NodeFx,
+} from './liveGraph'
 import { NODE_RADIUS, TERMINAL_RADIUS } from './NodeOrb'
 
 export const PACKET_SECONDS = 0.6
@@ -43,33 +54,72 @@ export function EventDriver() {
     Object.assign(window, { __xray: live, __xrayShake: shake })
   const arrivals = useRef(new Map<string, number>())
 
+  const lastSeek = useRef(0)
+
   useFrame(({ clock }, delta) => {
     const now = clock.elapsedTime
     const dt = Math.min(delta, 0.05)
     const runId = sim.state.runId
+    const viewer = useViewer.getState()
 
-    if (runId !== currentRun.current) {
+    // a new run, or a jump in the timeline: drop whatever was still animating
+    if (runId !== currentRun.current || viewer.seekId !== lastSeek.current) {
       currentRun.current = runId
+      lastSeek.current = viewer.seekId
       resetEffects(live)
       arrivals.current.clear()
     }
 
     if (runId) {
       const log = eventLog.get(runId)
-      let cursor = effectCursor.get(runId) ?? 0
       if (log) {
-        for (; cursor < log.length; cursor++) {
+        let cursor = effectCursor.get(runId) ?? 0
+        let end = log.length // live: everything that has arrived
+
+        if (viewer.mode === 'replay') {
+          // the playhead decides how far into the run we are
+          const duration = log.at(-1)?.t ?? 0
+          if (viewer.playing) {
+            playhead.t = Math.min(duration, playhead.t + Math.min(delta, 0.25) * 1000 * viewer.speed)
+            if (playhead.t >= duration && sim.state.finished) viewer.setPlaying(false)
+          }
+          end = countAtOrBefore(log, playhead.t)
+        } else {
+          const running = !sim.state.finished
+          playhead.t = running ? sim.anchor.t + (performance.now() - sim.anchor.wall) : sim.state.t
+        }
+
+        for (; cursor < end; cursor++) {
           const event = log[cursor]
-          if (event) handleEvent(live, arrivals.current, event, now)
+          if (!event) continue
+          if (viewer.mode === 'replay') sim.state = applyEvent(sim.state, event) // live ingest did it already
+          handleEvent(live, arrivals.current, event, now)
         }
         effectCursor.set(runId, cursor)
       }
     }
 
     stepEffects(live, now, dt)
+    updateFocus(live, now)
   })
 
   return null
+}
+
+/** The node the cinematic camera follows: the latest-started one that is still active. */
+function updateFocus(live: LiveGraph, now: number) {
+  let best: string | null = null
+  let bestStart = -1
+  for (const [id, fx] of live.fx) {
+    if (!isTerminal(id) && fx.active > 0 && fx.ringStart > bestStart) {
+      best = id
+      bestStart = fx.ringStart
+    }
+  }
+  if (best === null && cinemaFocus.id !== null) cinemaFocus.idleSince = now
+  cinemaFocus.id = best
+  const at = best ? live.positions.get(best) : undefined
+  if (at) cinemaFocus.pos.copy(at)
 }
 
 function resetEffects(live: LiveGraph) {

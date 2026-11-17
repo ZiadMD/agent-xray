@@ -58,6 +58,8 @@ class RunStartData(_Model):
 class NodeStartData(_Model):
     task_id: str
     node: str
+    input_preview: str = ""
+    """What the node received (a short preview of its input state)."""
 
 
 class NodeEndData(_Model):

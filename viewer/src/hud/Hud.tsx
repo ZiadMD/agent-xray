@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { equivalentCost, formatUsd } from '../sim/pricing'
-import { useViewer, type RunSummary } from '../store/viewer'
-import { useRunClock, useSimSnapshot } from './useSim'
+import type { SimState } from '../sim/reducer'
+import { RECORD_MODE, useViewer } from '../store/viewer'
+import { usePlayheadClock, useSimSnapshot } from './useSim'
 
-const STATUS_STYLE: Record<RunSummary['status'], string> = {
+const STATUS_STYLE: Record<SimState['status'], string> = {
+  idle: 'text-hud/60 border-hud/20 bg-hud/5',
   running: 'text-cyan border-cyan/40 bg-cyan/10',
   ok: 'text-ok border-ok/40 bg-ok/10',
   error: 'text-err border-err/40 bg-err/10',
@@ -70,20 +72,41 @@ export function Hud() {
   const connection = useViewer((s) => s.connection)
   const conn = CONNECTION_LABEL[connection]
   const state = useSimSnapshot()
+  const pickerOpen = useViewer((s) => s.pickerOpen)
   const [showCost, setShowCost] = useCostToggle()
 
-  const running = run?.status === 'running'
-  const clock = useRunClock(!!running, run?.totals?.duration_ms ?? null)
+  const status = state.status
+  const running = status === 'running'
+  const clock = usePlayheadClock()
 
-  // The final numbers come from run_end once it arrives; until then the live totals.
+  // The final numbers come from run_end once the playhead has reached it; until then the
+  // totals so far.
   const live = state.totals
-  const done = run?.totals ?? null
+  const done = state.final
   const inputTokens = done?.input_tokens ?? live.inputTokens
   const outputTokens = done?.output_tokens ?? live.outputTokens
   const llmCalls = done?.llm_calls ?? live.llmCalls
   const toolCalls = done?.tool_calls ?? live.toolCalls
   const avgLatency = live.llmCalls ? live.llmLatencyMs / live.llmCalls : null
   const cost = equivalentCost(live.byModel)
+
+  const hudVisible = useViewer((s) => s.hudVisible)
+  if (!hudVisible) return null
+
+  if (RECORD_MODE) {
+    // recording layout: just the graph name and a token counter
+    return (
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between px-12 pt-10 font-sans">
+        <h1 className="text-3xl font-medium tracking-tight text-hud/90">{run?.graphName ?? ''}</h1>
+        {run && (
+          <div className="flex items-baseline gap-3 font-mono tabular-nums">
+            <span className="text-4xl text-amber">{number.format(inputTokens + outputTokens)}</span>
+            <span className="text-xs uppercase tracking-[0.2em] text-hud/50">tokens</span>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none font-sans text-hud/70">
@@ -96,12 +119,12 @@ export function Hud() {
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-medium tracking-tight text-hud/90">{run.graphName}</h1>
               <span
-                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] ${STATUS_STYLE[run.status]}`}
+                className={`rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] ${STATUS_STYLE[status]}`}
               >
                 {running && (
                   <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-cyan align-middle" />
                 )}
-                {run.status}
+                {status}
               </span>
             </div>
             <span className="font-mono text-lg tabular-nums text-hud/80">{formatClock(clock)}</span>
@@ -167,16 +190,12 @@ export function Hud() {
         )}
       </div>
 
-      {!run && (
+      {!run && !pickerOpen && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
           <span className="font-mono text-xs uppercase tracking-[0.3em] text-cyan/70">waiting for a run</span>
           <code className="font-mono text-sm text-hud/50">graph = watch(graph); graph.invoke(...)</code>
         </div>
       )}
-
-      <footer className="absolute bottom-5 left-6 font-mono text-[10px] uppercase tracking-[0.2em] text-hud/30">
-        drag to orbit · scroll to zoom · right-drag to pan
-      </footer>
     </div>
   )
 }
