@@ -4,11 +4,11 @@ import { gsap } from 'gsap'
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import type { Vec3 } from '../layout/layout'
+import { VIEW_DIRECTION as VIEW, type Vec3 } from '../layout/layout'
 import { useViewer } from '../store/viewer'
 import { cinemaFocus, clamp01, easeInOutCubic } from './liveGraph'
 
-const VIEW_DIRECTION = new THREE.Vector3(0.16, 0.34, 1).normalize()
+const VIEW_DIRECTION = new THREE.Vector3(...VIEW)
 const DWELL_SECONDS = 1.0 // don't hop between nodes faster than this
 const IDLE_SECONDS = 2.2 // quiet for this long: pull back to the whole graph
 
