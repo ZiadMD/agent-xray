@@ -22,6 +22,8 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 2000,
   },
   server: {
+    // pricing.json is shared with the Python package
+    fs: { allow: ['..'] },
     // `pnpm dev` talks to a running X-Ray server (python side) on :7777
     proxy: {
       '/ws': { target: 'ws://localhost:7777', ws: true },

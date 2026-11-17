@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import { effectCursor, eventLog, sim } from '../store/viewer'
 import type { XRayEvent } from '../types/events'
-import { createNodeFx, edgeKey, useLiveGraph, type LiveGraph, type NodeFx } from './liveGraph'
+import { createNodeFx, edgeKey, phaseOf, shake, useLiveGraph, type LiveGraph, type NodeFx } from './liveGraph'
 import { NODE_RADIUS, TERMINAL_RADIUS } from './NodeOrb'
 
 export const PACKET_SECONDS = 0.6
@@ -11,6 +11,14 @@ const MIN_ACTIVE_SECONDS = 0.45
 const MAX_PACKETS = 48
 const MAX_PENDING_SPARKS = 600
 const SPARK_SPEED = 1.7
+/** A tool moon orbits at least this long, so a 2 ms tool call is still seen. */
+const MIN_MOON_SECONDS = 1.0
+/** Flash (0.25 s) then collapse into the node (0.35 s). */
+export const MOON_FLASH_SECONDS = 0.25
+export const MOON_EXIT_SECONDS = 0.6
+export const SHOCKWAVE_SECONDS = 1.3
+const MAX_MOONS = 48
+const MAX_SHOCKWAVES = 8
 const GROWTH_PER_TOKENS = 150 // chunks until a node has grown ~63% of its maximum
 
 const isTerminal = (id: string) => id === '__start__' || id === '__end__'
@@ -24,6 +32,8 @@ const isTerminal = (id: string) => id === '__start__' || id === '__end__'
  *   node_start  → the node lights up and a ring expands (after the packet arrives)
  *   node_end    → the node fades back (after a minimum visible time)
  *   token       → sparks stream off the node, at a rate that follows the tokens per second
+ *   tool_start  → a violet moon orbits the node until the tool ends (green or red flash)
+ *   error       → a red shockwave expands from the node and the camera shakes
  */
 export function EventDriver() {
   const live = useLiveGraph()
@@ -66,6 +76,8 @@ function resetEffects(live: LiveGraph) {
   for (const id of live.fx.keys()) live.fx.set(id, createNodeFx())
   live.edgeGlow.clear()
   live.packets.length = 0
+  live.moons.clear()
+  live.shockwaves.length = 0
 }
 
 function schedule(fx: NodeFx, at: number, kind: 'start' | 'end') {
@@ -119,6 +131,38 @@ function handleEvent(live: LiveGraph, arrivals: Map<string, number>, event: XRay
         )
       return
     }
+    case 'tool_start': {
+      const fx = live.fx.get(event.data.node)
+      if (!fx) return
+      if (live.moons.size >= MAX_MOONS) live.moons.delete(live.moons.keys().next().value as string)
+      live.moons.set(event.data.call_id, {
+        callId: event.data.call_id,
+        node: event.data.node,
+        start: Math.max(now, fx.lastOpAt),
+        endAt: -1,
+        ok: true,
+        phase: phaseOf(event.data.call_id),
+        tilt: 0.5 + (phaseOf(`${event.data.call_id}!`) / (Math.PI * 2)) * 0.9,
+      })
+      return
+    }
+    case 'tool_end': {
+      const moon = live.moons.get(event.data.call_id)
+      if (!moon) return
+      moon.ok = event.data.ok
+      moon.endAt = Math.max(now, moon.start + MIN_MOON_SECONDS)
+      return
+    }
+    case 'error': {
+      const fx = event.data.node ? live.fx.get(event.data.node) : undefined
+      if (!event.data.node || !fx) {
+        shake.trauma = Math.min(1, shake.trauma + 0.35)
+        return
+      }
+      live.shockwaves.push({ node: event.data.node, start: Math.max(now, fx.lastOpAt), shaken: false })
+      if (live.shockwaves.length > MAX_SHOCKWAVES) live.shockwaves.shift()
+      return
+    }
     default:
       return
   }
@@ -129,6 +173,19 @@ function stepEffects(live: LiveGraph, now: number, dt: number) {
   for (let i = live.packets.length - 1; i >= 0; i--) {
     const p = live.packets[i]
     if (p && now > p.start + p.duration) live.packets.splice(i, 1)
+  }
+
+  // finished moons, and errors whose node has become visible
+  for (const [id, moon] of live.moons)
+    if (moon.endAt >= 0 && now > moon.endAt + MOON_EXIT_SECONDS) live.moons.delete(id)
+  for (let i = live.shockwaves.length - 1; i >= 0; i--) {
+    const wave = live.shockwaves[i]
+    if (!wave) continue
+    if (!wave.shaken && now >= wave.start) {
+      wave.shaken = true
+      shake.trauma = Math.min(1, shake.trauma + 0.55)
+    }
+    if (now > wave.start + SHOCKWAVE_SECONDS) live.shockwaves.splice(i, 1)
   }
 
   // edges: fully lit while a packet flies, then fading out
@@ -151,6 +208,10 @@ function stepEffects(live: LiveGraph, now: number, dt: number) {
 
     const target = fx.active > 0 ? 1 : 0
     fx.activity += (target - fx.activity) * (1 - Math.exp(-dt * (target ? 12 : 2.2)))
+
+    // red while the last activation failed (cleared by the next start)
+    const failed = sim.state.nodes.get(id)?.status === 'error' ? 1 : 0
+    fx.error += (failed - fx.error) * (1 - Math.exp(-dt * (failed ? 8 : 3)))
 
     const terminal = isTerminal(id)
     const tokens = terminal ? 0 : (sim.state.nodes.get(id)?.tokens ?? 0)

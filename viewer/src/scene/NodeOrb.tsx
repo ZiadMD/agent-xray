@@ -55,6 +55,14 @@ export function NodeOrb({ node }: { node: GraphNode }) {
         }
   }, [terminal, tuning.hud, tuning.idle, tuning.active])
   const haloOn = useMemo(() => new THREE.Color(tuning.active), [tuning.active])
+  const failed = useMemo(
+    () => ({
+      core: new THREE.Color(tuning.error).multiplyScalar(0.5),
+      rim: new THREE.Color(tuning.error).multiplyScalar(1.6),
+      halo: new THREE.Color(tuning.error),
+    }),
+    [tuning.error],
+  )
 
   useEffect(
     () => () => {
@@ -79,12 +87,17 @@ export function NodeOrb({ node }: { node: GraphNode }) {
     const u = material.uniforms
     ;(u.uCore?.value as THREE.Color).copy(looks.coreIdle).lerp(looks.coreOn, a)
     ;(u.uRim?.value as THREE.Color).copy(looks.rimIdle).lerp(looks.rimOn, a)
+    const e = fx?.error ?? 0
+    if (e > 0.001) {
+      ;(u.uCore?.value as THREE.Color).lerp(failed.core, e)
+      ;(u.uRim?.value as THREE.Color).lerp(failed.rim, e)
+    }
     if (u.uGlow) u.uGlow.value = tuning.orbGlow * (1 + 0.2 * a * Math.sin(t * 9 + phase))
     if (u.uTime) u.uTime.value = t
 
     const halo_ = halo.current
     if (halo_) {
-      halo_.material.color.copy(looks.haloIdle).lerp(haloOn, a)
+      halo_.material.color.copy(looks.haloIdle).lerp(haloOn, a).lerp(failed.halo, e)
       halo_.material.opacity = tuning.haloOpacity * (0.75 + 0.25 * Math.sin(t * 1.25 + phase)) * (1 + 1.3 * a)
       halo_.scale.setScalar(radius * 6 * (1 + 0.45 * a))
     }

@@ -8,6 +8,7 @@ import { clamp01, createLiveGraph, easeOutCubic, LiveGraphContext, useLiveGraph 
 import { NodeOrb } from './NodeOrb'
 import { Packets } from './Packets'
 import { Sparks } from './Sparks'
+import { Moons, Shockwaves } from './ToolFx'
 import { SubgraphShell } from './SubgraphShell'
 
 /** The constellation for one topology: subgraph shells, edges and node orbs. */
@@ -31,6 +32,8 @@ export function GraphView({ topology, layout }: { topology: GraphTopology; layou
       ))}
       <Packets />
       <Sparks />
+      <Moons />
+      <Shockwaves />
     </LiveGraphContext>
   )
 }

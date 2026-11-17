@@ -21,7 +21,32 @@ export interface LiveGraph {
   edgeGlow: Map<string, EdgeGlow>
   packets: Packet[]
   sparks: SparkPool
+  /** Tool calls currently orbiting their node (or just finishing), by call id. */
+  moons: Map<string, Moon>
+  shockwaves: Shockwave[]
 }
+
+export interface Moon {
+  callId: string
+  node: string
+  /** Clock time it appears. */
+  start: number
+  /** Clock time the call visibly ends, or -1 while the tool is still running. */
+  endAt: number
+  ok: boolean
+  phase: number
+  tilt: number
+}
+
+export interface Shockwave {
+  node: string
+  /** Clock time it starts (an error shows once its node is visibly active). */
+  start: number
+  shaken: boolean
+}
+
+/** Screen shake, 0 → 1. Written by the event driver, applied by the camera. */
+export const shake = { trauma: 0 }
 
 /** A scheduled change of a node's visual activity (used to wait for an arriving packet). */
 export interface FxOp {
@@ -38,6 +63,8 @@ export interface NodeFx {
   ringStart: number
   /** Smoothed extra radius from streamed tokens, 0 → 1. */
   grow: number
+  /** Smoothed 0 → 1 red tint while the node's last activation failed. */
+  error: number
   /** Sparks waiting to be emitted. */
   pending: number
   emitCarry: number
@@ -62,7 +89,17 @@ export interface Packet {
 export const edgeKey = (e: { source: string; target: string }) => `${e.source}→${e.target}`
 
 export function createNodeFx(): NodeFx {
-  return { active: 0, activity: 0, ringStart: -1, grow: 0, pending: 0, emitCarry: 0, ops: [], lastOpAt: 0 }
+  return {
+    active: 0,
+    activity: 0,
+    ringStart: -1,
+    grow: 0,
+    error: 0,
+    pending: 0,
+    emitCarry: 0,
+    ops: [],
+    lastOpAt: 0,
+  }
 }
 
 export function createLiveGraph(layout: Layout): LiveGraph {
@@ -84,6 +121,8 @@ export function createLiveGraph(layout: Layout): LiveGraph {
     edgeGlow: new Map(),
     packets: [],
     sparks: new SparkPool(),
+    moons: new Map(),
+    shockwaves: [],
   }
 }
 

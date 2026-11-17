@@ -9,6 +9,7 @@ import { CameraRig } from './CameraRig'
 import { Effects } from './Effects'
 import { GraphView } from './GraphView'
 import { StarDust } from './StarDust'
+import { Shake } from './ToolFx'
 
 // ?stats shows an FPS / frame-time panel
 const SHOW_STATS = new URLSearchParams(location.search).has('stats')
@@ -35,6 +36,7 @@ export function Scene({ topology }: { topology: GraphTopology | null }) {
         <StarDust />
         {graph && layout && <GraphView key={key} topology={graph} layout={layout} />}
         <CameraRig extent={layout?.extent ?? DEFAULT_EXTENT} fitKey={key} />
+        <Shake />
         <Effects />
         {SHOW_STATS && <Stats />}
       </TuningContext>

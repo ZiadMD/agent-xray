@@ -19,11 +19,13 @@ export function SubgraphShell({ node, bounds }: { node: GraphNode; bounds: Subgr
     [live, node.id],
   )
 
-  useEffect(() => {
-    ;(material.uniforms.uColor?.value as THREE.Color)
-      .set(tuning.idle)
-      .lerp(new THREE.Color(tuning.active), 0.35)
-  }, [material, tuning])
+  const colors = useMemo(
+    () => ({
+      idle: new THREE.Color(tuning.idle).lerp(new THREE.Color(tuning.active), 0.35),
+      on: new THREE.Color(tuning.active).multiplyScalar(1.5),
+    }),
+    [tuning.idle, tuning.active],
+  )
   useEffect(() => () => material.dispose(), [material])
 
   useFrame(() => {
@@ -33,7 +35,11 @@ export function SubgraphShell({ node, bounds }: { node: GraphNode; bounds: Subgr
     const [x, y, z] = bounds.center
     g.position.set(x * appear, y * appear, z * appear)
     g.scale.setScalar(Math.max(0.001, appear))
-    if (material.uniforms.uOpacity) material.uniforms.uOpacity.value = 0.14 * appear
+    // the shell glows while any child is working
+    let activity = 0
+    for (const id of children) activity = Math.max(activity, live.fx.get(id)?.activity ?? 0)
+    ;(material.uniforms.uColor?.value as THREE.Color).copy(colors.idle).lerp(colors.on, activity)
+    if (material.uniforms.uOpacity) material.uniforms.uOpacity.value = 0.14 * appear * (1 + 2.4 * activity)
   })
 
   return (

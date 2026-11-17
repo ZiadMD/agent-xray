@@ -26,7 +26,11 @@ export const effectCursor = new Map<string, number>()
  * The persistent scene state (`applyEvent` folded over the current run's events).
  * Mutable holder, read from animation frames.
  */
-export const sim: { state: SimState } = { state: emptyState() }
+export const sim: { state: SimState; anchor: { t: number; wall: number } } = {
+  state: emptyState(),
+  // run time of the latest event and the wall-clock moment it arrived, to tick the HUD clock
+  anchor: { t: 0, wall: 0 },
+}
 
 interface ViewerState {
   connection: ConnectionStatus
@@ -55,6 +59,7 @@ export const useViewer = create<ViewerState>()((set, get) => ({
       if (!live) effectCursor.set(event.run_id, log.length)
 
       sim.state = applyEvent(sim.state, event)
+      if (event.run_id === sim.state.runId) sim.anchor = { t: event.t, wall: performance.now() }
 
       if (event.type === 'run_start') {
         run = {
