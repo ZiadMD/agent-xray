@@ -40,7 +40,7 @@ export function EventDriver() {
   const currentRun = useRef<string | null>(null)
   // with ?stats, expose the live effect state for debugging in the console
   if (new URLSearchParams(location.search).has('stats'))
-    (window as unknown as { __xray: LiveGraph }).__xray = live
+    Object.assign(window, { __xray: live, __xrayShake: shake })
   const arrivals = useRef(new Map<string, number>())
 
   useFrame(({ clock }, delta) => {
