@@ -24,3 +24,9 @@ python/agent_xray/static/
 
 # Static demo build
 viewer/dist-demo/
+
+# Launch media rendered by launch/tools (large, reproducible)
+launch/*.mp4
+launch/tools/vo/
+launch/tools/soundtrack.wav
+launch/tools/timeline.json

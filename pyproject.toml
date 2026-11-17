@@ -44,3 +44,5 @@ known-local-folder = ["conftest", "basic_fake"]
 [tool.ruff.lint.per-file-ignores]
 # example prompts and canned text are prose
 "examples/**" = ["E501"]
+# the launch-video tools carry inline HTML/CSS/JS for the page overlay
+"launch/**" = ["E501"]
