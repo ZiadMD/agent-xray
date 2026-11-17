@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "corepack enable && cd viewer && pnpm install --frozen-lockfile",
+  "buildCommand": "cd viewer && pnpm build:demo",
+  "outputDirectory": "viewer/dist-demo",
+  "framework": null
+}

@@ -5,7 +5,7 @@ import { Inspector } from './hud/Inspector'
 import { RunPicker } from './hud/RunPicker'
 import { Timeline } from './hud/Timeline'
 import { connectLive } from './net/live'
-import { fetchRecordings, openRecording } from './net/recordings'
+import { DEMO, fetchRecordings, openRecording } from './net/recordings'
 import { Scene } from './scene/Scene'
 import { RECORD_MODE, useViewer } from './store/viewer'
 
@@ -76,7 +76,8 @@ export function App() {
 
   useEffect(() => {
     const { ingest, setConnection, setRecordings, setPickerOpen } = useViewer.getState()
-    const stop = connectLive(ingest, setConnection)
+    // the demo has no server to connect to
+    const stop = DEMO ? () => {} : connectLive(ingest, setConnection)
 
     const wanted = new URLSearchParams(location.search).get('run')
     if (wanted) {
@@ -87,6 +88,9 @@ export function App() {
         .then((list) => {
           setRecordings(list)
           if (list.length > 0 && useViewer.getState().run === null) setPickerOpen(true)
+          // the demo opens straight into a run: prefer the crew, which has the most going on
+          const first = list.find((r) => r.name === 'crew') ?? list[0]
+          if (DEMO && first) void openRecording(first.id).catch(() => {})
         })
         .catch(() => setRecordings([]))
     }

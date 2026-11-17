@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { DEMO } from '../net/recordings'
 import { equivalentCost, formatUsd } from '../sim/pricing'
 import type { SimState } from '../sim/reducer'
 import { RECORD_MODE, useViewer } from '../store/viewer'
@@ -70,7 +71,7 @@ function Stat({ label, children, tone }: { label: string; children: React.ReactN
 export function Hud() {
   const run = useViewer((s) => s.run)
   const connection = useViewer((s) => s.connection)
-  const conn = CONNECTION_LABEL[connection]
+  const conn = DEMO ? { dot: 'bg-violet', text: 'demo · recorded runs' } : CONNECTION_LABEL[connection]
   const state = useSimSnapshot()
   const pickerOpen = useViewer((s) => s.pickerOpen)
   const [showCost, setShowCost] = useCostToggle()

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A live, cinematic 3D view of any LangGraph app's brain. Add watch(graph) and see it think."
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [{ name = "Agent X-Ray contributors" }]
 keywords = ["langgraph", "langchain", "agents", "observability", "visualization", "3d"]
@@ -32,5 +33,10 @@ xray = "agent_xray.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# the built viewer is gitignored, so it has to be listed explicitly (scripts/build.py builds it first)
 [tool.hatch.build.targets.wheel]
 packages = ["agent_xray"]
+artifacts = ["agent_xray/static/**"]
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["agent_xray/static/**"]

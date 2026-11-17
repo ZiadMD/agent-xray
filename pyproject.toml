@@ -15,6 +15,14 @@ dev = [
     "pytest-asyncio>=0.24",
     "ruff>=0.6",
 ]
+# the demo crew (examples/crew): `uv sync --group crew`
+crew = [
+    "langchain-groq>=1.2",
+    "langchain-google-genai>=4.5",
+    "ddgs>=9",
+    "tavily-python>=0.8",
+    "python-dotenv>=1",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
@@ -32,3 +40,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.isort]
 known-first-party = ["agent_xray"]
 known-local-folder = ["conftest", "basic_fake"]
+
+[tool.ruff.lint.per-file-ignores]
+# example prompts and canned text are prose
+"examples/**" = ["E501"]

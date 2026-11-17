@@ -115,3 +115,11 @@ def test_cli_rejects_missing_inputs(tmp_path: Path) -> None:
         cli_main(["serve", "--dir", str(tmp_path / "missing"), "--no-browser"])
     with pytest.raises(SystemExit):
         cli_main(["replay", str(tmp_path / "nope.jsonl"), "--no-browser"])
+
+
+def test_preview_of_a_command_shows_only_what_is_set() -> None:
+    from langgraph.types import Command
+
+    out = pv.preview(Command(update={"score": 3}, goto="writer"))
+    assert '"update":{"score":3}' in out and '"goto":"writer"' in out
+    assert "null" not in out

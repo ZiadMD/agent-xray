@@ -84,7 +84,9 @@ def compact(value: Any, depth: int = 0) -> Any:
         except Exception:
             return truncate(repr(value), 120)
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
-        return compact({f.name: getattr(value, f.name) for f in dataclasses.fields(value)}, depth)
+        fields = {f.name: getattr(value, f.name) for f in dataclasses.fields(value)}
+        # leave out empty fields (a langgraph Command is mostly None: show its `update`)
+        return compact({k: v for k, v in fields.items() if v not in (None, (), [], {})}, depth)
     if isinstance(value, Mapping):
         items = list(value.items())
         out = {str(k): compact(v, depth + 1) for k, v in items[:_MAX_KEYS]}

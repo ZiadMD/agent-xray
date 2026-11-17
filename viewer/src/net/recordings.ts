@@ -1,9 +1,18 @@
 import { eventLog, useViewer, type RecordingInfo } from '../store/viewer'
 import type { XRayEvent } from '../types/events'
 
-/** Where recordings come from. The server serves them from its directory (M6 adds a static source). */
+/** The demo build is a static, replay-only site: no server, recordings are plain files. */
+export const DEMO = import.meta.env.MODE === 'demo'
+
+const listUrl = () => (DEMO ? `${import.meta.env.BASE_URL}recordings/index.json` : '/api/runs')
+const runUrl = (id: string) =>
+  DEMO
+    ? `${import.meta.env.BASE_URL}recordings/${encodeURIComponent(id)}.jsonl`
+    : `/api/runs/${encodeURIComponent(id)}`
+
+/** Recordings come from the server's directory, or from /recordings in the demo build. */
 export async function fetchRecordings(): Promise<RecordingInfo[]> {
-  const response = await fetch('/api/runs')
+  const response = await fetch(listUrl())
   if (!response.ok) throw new Error(`recordings: ${response.status}`)
   return (await response.json()) as RecordingInfo[]
 }
@@ -23,7 +32,7 @@ export function parseJsonl(text: string): XRayEvent[] {
 
 /** Load a recording into the event log and show it in replay mode. */
 export async function openRecording(id: string, play = true): Promise<void> {
-  const response = await fetch(`/api/runs/${encodeURIComponent(id)}`)
+  const response = await fetch(runUrl(id))
   if (!response.ok) throw new Error(`recording ${id}: ${response.status}`)
   const events = parseJsonl(await response.text())
   const first = events[0]

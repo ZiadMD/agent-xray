@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { DEMO } from '../net/recordings'
 import { buildLanes } from '../sim/timeline'
 import { eventLog, playhead, SPEEDS, useViewer } from '../store/viewer'
 import { usePlayheadClock, useSimSnapshot } from './useSim'
@@ -238,20 +239,22 @@ export function Timeline() {
               {s}×
             </button>
           ))}
-          <button
-            type="button"
-            disabled={!canGoLive}
-            onClick={goLive}
-            title="Follow the newest run as it happens"
-            className={`ml-3 flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] transition-colors disabled:cursor-default ${
-              isLive
-                ? 'border-ok/40 bg-ok/10 text-ok'
-                : 'border-hud/20 text-hud/60 enabled:hover:border-ok/50 enabled:hover:text-ok'
-            }`}
-          >
-            <span className={`size-1.5 rounded-full ${isLive ? 'animate-pulse bg-ok' : 'bg-hud/40'}`} />
-            live
-          </button>
+          {!DEMO && (
+            <button
+              type="button"
+              disabled={!canGoLive}
+              onClick={goLive}
+              title="Follow the newest run as it happens"
+              className={`ml-3 flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] transition-colors disabled:cursor-default ${
+                isLive
+                  ? 'border-ok/40 bg-ok/10 text-ok'
+                  : 'border-hud/20 text-hud/60 enabled:hover:border-ok/50 enabled:hover:text-ok'
+              }`}
+            >
+              <span className={`size-1.5 rounded-full ${isLive ? 'animate-pulse bg-ok' : 'bg-hud/40'}`} />
+              live
+            </button>
+          )}
         </div>
       </div>
     </div>
