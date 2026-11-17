@@ -29,6 +29,7 @@ RUNS = ROOT.parent / "recordings"  # the curated recordings the demo site uses
 SWARM = "20261117-184204_research_swarm_3ebffeda"
 BUGS = "20261117-184937_bug_hunter_f22315c2"
 W, H, FPS = 1080, 1350, 60
+GIF_SIZE, GIF_EVERY = (1280, 720), 2  # README loop: landscape, master at 30 fps
 DT = 1000 / FPS
 
 # --- page scripts ----------------------------------------------------------------
@@ -220,6 +221,9 @@ class Rec:
     moons: dict[str, Any] = field(default_factory=dict)
     run: str = ""
     last_warp: float = 1.0
+    size: tuple[int, int] = (W, H)
+    every: int = 1  # screenshot every Nth frame (the page still steps at 60 fps)
+    capturing: bool = True
 
     def mark(self, kind: str, frame: int | None = None, **data: Any) -> None:
         if self.trace:
@@ -230,7 +234,7 @@ class Rec:
     async def open(self, run: str, scale: float = 1) -> Page:
         graph_name = "_".join(run.split("_")[1:-1])
         page = await self.browser.new_page(
-            viewport={"width": W, "height": H}, device_scale_factor=scale
+            viewport={"width": self.size[0], "height": self.size[1]}, device_scale_factor=scale
         )
         page.on("console", lambda m: m.type == "error" and print("  page error:", m.text[:200]))
         await page.add_init_script(VIRTUAL_TIME)
@@ -296,7 +300,7 @@ class Rec:
             self.run_t = head * self.duration
         if self.trace:
             self.trace_frame(prev, step, moons)
-        if self.sink is not None:
+        if self.sink is not None and self.capturing and self.frames % self.every == 0:
             shot = await self.cdp.send("Page.captureScreenshot", {"format": "jpeg", "quality": 94})
             assert self.sink.stdin
             self.sink.stdin.write(base64.b64decode(shot["data"]))
@@ -596,6 +600,44 @@ async def video(rec: Rec) -> None:
 # --- stills ------------------------------------------------------------------------
 
 
+async def gif(rec: Rec) -> None:
+    """The README loop: the swarm runs, then the replay scrubs back to the loop and inspects it."""
+    gw, gh = GIF_SIZE
+    await rec.open(SWARM)
+    await rec.toggle_play()  # hold t=0 off camera while the graph flies in
+    rec.capturing = False
+    await rec.hold(2.8)
+    rec.capturing = True
+    await rec.hold(0.3)
+    await rec.toggle_play()
+    await rec.until(rec.duration)
+    rec.playing = False
+    await rec.hold(0.7)
+    # scrub back to the fact checker's first verdict, then open it in the inspector
+    track_x0, track_x1, track_y = 26, gw - 26, gh - 85
+    x_end = track_x1 - 2
+    x_loop = track_x0 + (track_x1 - track_x0) * 9600 / rec.duration
+    assert rec.page
+    await rec.promo("cursorAt", gw * 0.62, gh * 0.78)
+    await rec.page.mouse.move(gw * 0.62, gh * 0.78)
+    await rec.move(gw * 0.62, gh * 0.78, x_end, track_y, 0.7)
+    await rec.page.mouse.down()
+    await rec.promo("ripple")
+    await rec.move(x_end, track_y, x_loop, track_y, 1.0)
+    await rec.page.mouse.up()
+    await rec.hold(0.4)
+    await rec.move(x_loop, track_y, *GIF_FACT_CHECKER, 0.8)
+    await rec.page.mouse.down()
+    await rec.page.mouse.up()
+    await rec.promo("ripple")
+    await rec.hold(0.4)
+    await rec.move(*GIF_FACT_CHECKER, gw * 0.5, gh * 0.84, 0.6)
+    await rec.hold(2.2)
+
+
+GIF_FACT_CHECKER = (753, 318)  # where the node sits in the 1280x720 layout
+
+
 async def stills(rec: Rec, out: Path) -> None:
     async def shot(name: str) -> None:
         assert rec.cdp
@@ -655,6 +697,17 @@ async def main() -> None:
     server = start_viewer(RUNS, 7799)
     sink = None
     out = ROOT / "agent-xray-demo-silent.mp4"  # soundtrack.py adds the audio
+    if what == "gif":
+        import imageio_ffmpeg
+
+        # a near-lossless master first; gif_encode() turns it into the README GIF
+        out = ROOT / "tools" / "gif-master.mp4"
+        sink = subprocess.Popen(
+            [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error"]
+            + ["-f", "image2pipe", "-framerate", str(FPS // GIF_EVERY), "-c:v", "mjpeg", "-i", "-"]
+            + ["-c:v", "libx264", "-preset", "slow", "-crf", "8", "-pix_fmt", "yuv444p", str(out)],
+            stdin=subprocess.PIPE,
+        )
     if what == "video":
         import imageio_ffmpeg
 
@@ -681,7 +734,10 @@ async def main() -> None:
                 + ["--force_high_performance_gpu", "--hide-scrollbars"],
             )
             rec = Rec(browser, server.url, sink)
-            if what in ("video", "trace"):
+            if what == "gif":
+                rec.size, rec.every = GIF_SIZE, GIF_EVERY
+                await gif(rec)
+            elif what in ("video", "trace"):
                 # trace logs the frame every sound should land on (the soundtrack's input);
                 # `video` traces too, so the log matches the rendered frames exactly
                 rec.trace = True
@@ -704,6 +760,28 @@ async def main() -> None:
             sink.wait()
             print(f"wrote {out} ({rec.frames} frames, {rec.frames / FPS:.1f}s)")
         server.stop()
+    if what == "gif":
+        gif_encode(out, ROOT.parent / "docs" / "demo.gif")
+
+
+def gif_encode(master: Path, out: Path) -> None:
+    """800 px, 15 fps, 160 colors. The temporal denoise calms the twinkling star field and the
+    glow, which would otherwise change every pixel of every frame (it cuts the file ~2.5x)."""
+    import imageio_ffmpeg
+
+    out.parent.mkdir(exist_ok=True)
+    subprocess.run(
+        [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(master)]
+        + [
+            "-vf",
+            "fps=15,scale=800:-1:flags=lanczos,hqdn3d=0:0:6:6,split[a][b];"
+            "[a]palettegen=max_colors=160:stats_mode=diff[p];"
+            "[b][p]paletteuse=dither=none:diff_mode=rectangle",
+        ]
+        + ["-loop", "0", str(out)],
+        check=True,
+    )
+    print(f"wrote {out} ({out.stat().st_size / 1048576:.1f} MB)")
 
 
 if __name__ == "__main__":

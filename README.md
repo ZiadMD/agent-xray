@@ -2,8 +2,10 @@
 
 **Watch any LangGraph app think.** One line turns your compiled graph into a live, cinematic 3D view of its "brain": nodes pulse, messages fly along the real edges, tokens stream as sparks, tool calls orbit their node, errors explode. Every run is recorded, so you can replay it, step through it and scrub it like a video.
 
-<!-- TODO: replace with a screen recording (record mode: ?record=1) -->
-<p align="center"><em>[ GIF: the crew running, then scrubbing back to the loop ]</em></p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ZiadMD/agent-xray/main/docs/demo.gif" width="800" alt="Agent X-Ray replaying a real research swarm: a planner hands the question to three scout sub-agents that search in parallel, a fact checker sends the first draft back, then the timeline is scrubbed back and the fact checker opened in the inspector">
+  <br><sub>A real run of <a href="https://github.com/ZiadMD/agent-xray/blob/main/examples/showcase/swarm.py"><code>examples/showcase/swarm.py</code></a>, replayed: three scout sub-agents search in parallel, the fact checker sends the draft back, then a scrub back and a click on a node.</sub>
+</p>
 
 ```python
 from agent_xray import watch
