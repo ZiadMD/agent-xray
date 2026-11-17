@@ -8,8 +8,8 @@
 ```python
 from agent_xray import watch
 
-graph = watch(graph)          # nothing else changes
-graph.invoke({"topic": "..."})   # a browser tab opens and shows the run
+graph = watch(graph)  # nothing else changes
+graph.invoke({"topic": "..."})  # a browser tab opens and shows the run
 ```
 
 ```bash
