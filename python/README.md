@@ -8,13 +8,15 @@
 ```python
 from agent_xray import watch
 
-graph = watch(graph)  # nothing else changes
-graph.invoke({"topic": "..."})  # a browser tab opens and shows the run
+graph = watch(graph)          # nothing else changes
+graph.invoke({"topic": "..."})   # a browser tab opens and shows the run
 ```
 
 ```bash
-pip install agent-xray
+pip install xry4gnt
 ```
+
+The package is called `xry4gnt` on PyPI (the name `agent-xray` belongs to another project). You still `import agent_xray` and run `xray`.
 
 No Node needed: the built viewer ships inside the wheel.
 
@@ -54,7 +56,7 @@ Viewer keys: `Space` play/pause · `←` `→` step · `R` restart · `C` cinema
 ## Try it
 
 ```bash
-git clone <this repo> && cd agent-xray
+git clone https://github.com/ZiadMD/agent-xray && cd agent-xray
 uv sync
 uv run python examples/basic_fake.py        # no API keys: a loop, a tool, a subgraph, a failing node
 uv run python examples/crew/run.py --fake   # the demo crew with scripted models
@@ -99,6 +101,18 @@ cd viewer && pnpm build:demo             # replay-only static site into viewer/d
 ```
 
 The demo build is deployable as-is (Vercel: see `vercel.json`).
+
+## Privacy and security
+
+- The viewer server listens on `127.0.0.1` only, answers only to `localhost` / `127.0.0.1` host names (this blocks DNS rebinding) and refuses WebSocket connections from pages of other sites.
+- Recordings hold short previews of your data (inputs, outputs, tool arguments and results, truncated to 280 characters, with API-key-looking strings redacted). Redaction is pattern-based and not a guarantee: look at a recording before you share it.
+
+## Limitations
+
+- `watch()` does not add a `thread_id` for you: a graph with a checkpointer still needs one in its config, exactly as without X-Ray.
+- `stream_events` / `astream_events` are not watched yet (calls pass through unchanged).
+- Chat models are made to stream while a graph is watched (that is what makes live tokens possible), which can change message ids slightly compared with an unwatched run.
+- A second watched script started while another holds port 7777 opens its own viewer on the next free port.
 
 ## Roadmap
 

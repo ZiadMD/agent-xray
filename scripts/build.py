@@ -3,7 +3,7 @@
     uv run python scripts/build.py              # viewer, then wheel + sdist into dist/
     uv run python scripts/build.py --no-viewer   # reuse an existing viewer build
 
-The wheel carries the built viewer, so `pip install agent-xray` needs no Node.
+The wheel carries the built viewer, so `pip install xry4gnt` needs no Node.
 """
 
 from __future__ import annotations

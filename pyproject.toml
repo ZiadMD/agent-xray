@@ -6,11 +6,11 @@
 members = ["python"]
 
 [tool.uv.sources]
-agent-xray = { workspace = true }
+xry4gnt = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "agent-xray",
+    "xry4gnt",
     "pytest>=8",
     "pytest-asyncio>=0.24",
     "ruff>=0.6",

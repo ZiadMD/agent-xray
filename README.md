@@ -13,8 +13,10 @@ graph.invoke({"topic": "..."})   # a browser tab opens and shows the run
 ```
 
 ```bash
-pip install agent-xray
+pip install xry4gnt
 ```
+
+The package is called `xry4gnt` on PyPI (the name `agent-xray` belongs to another project). You still `import agent_xray` and run `xray`.
 
 No Node needed: the built viewer ships inside the wheel.
 
